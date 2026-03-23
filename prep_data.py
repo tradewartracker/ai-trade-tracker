@@ -12,10 +12,10 @@ import os
 import pandas as pd
 
 # ---------- paths ----------
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 TRADE_FILE = os.path.join(REPO_ROOT, "data-input", "TOTALdata-current.parquet")
 CLASS_FILE = os.path.join(REPO_ROOT, "data-input", "hs10_classification_final_v3.csv")
-OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+OUTPUT_DIR = os.path.join(REPO_ROOT, "data")
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "ai_trade_series.parquet")
 
 # ---------- series definitions ----------
@@ -41,6 +41,13 @@ def compute_series(df, mask, base_year="2023"):
     return dollars, index
 
 
+def compute_tariff_rate(df, mask):
+    """Compute monthly effective tariff rate (duties/imports) as a percentage for a subset."""
+    subset = df.loc[mask].groupby("time")[["imports", "duties"]].sum()
+    tariff = 100.0 * subset["duties"] / subset["imports"].where(subset["imports"] > 0)
+    return tariff
+
+
 def main():
     # --- load and prepare trade data (mirrors notebook 07) ---
     print("Loading trade data...")
@@ -50,6 +57,7 @@ def main():
     df["HS10"] = df["HS10"].astype("int64")
     df["time"] = pd.to_datetime(df["time"], format="%Y-%m")
     df["imports"] = df["CON_VAL_MO"].astype(float)
+    df["duties"] = df["CAL_DUT_MO"].astype(float)
 
     # Exclude volatile/special HS2 categories
     df = df[~df["HS2"].isin(["27", "71", "98", "99"])]
@@ -69,14 +77,18 @@ def main():
 
     # AI Related (High relevance, all categories)
     print("Computing series...")
-    ai_dollars, ai_index = compute_series(df, df["relevance"] == "High")
+    ai_mask = df["relevance"] == "High"
+    ai_dollars, ai_index = compute_series(df, ai_mask)
     result["ai_related_dollars"] = ai_dollars
     result["ai_related_index"] = ai_index
+    result["ai_related_tariff"] = compute_tariff_rate(df, ai_mask)
 
     # Non-AI Related (Low relevance)
-    non_ai_dollars, non_ai_index = compute_series(df, df["relevance"] == "Low")
+    non_ai_mask = df["relevance"] == "Low"
+    non_ai_dollars, non_ai_index = compute_series(df, non_ai_mask)
     result["non_ai_related_dollars"] = non_ai_dollars
     result["non_ai_related_index"] = non_ai_index
+    result["non_ai_related_tariff"] = compute_tariff_rate(df, non_ai_mask)
 
     # Subcategories
     for display_name, col_prefix, filter_fn in CATEGORIES:
@@ -84,6 +96,7 @@ def main():
         dollars, index = compute_series(df, mask)
         result[f"{col_prefix}_dollars"] = dollars
         result[f"{col_prefix}_index"] = index
+        result[f"{col_prefix}_tariff"] = compute_tariff_rate(df, mask)
 
     result.index.name = "date"
 
@@ -93,7 +106,7 @@ def main():
     print(f"Saved {len(result)} rows x {len(result.columns)} columns to {OUTPUT_FILE}")
 
     # --- validate against existing CSV ---
-    validation_file = os.path.join(REPO_ROOT, "data-output", "ai_trade_index_series.csv")
+    validation_file = os.path.join(REPO_ROOT, "data-input", "ai_trade_index_series.csv")
     if os.path.exists(validation_file):
         ref = pd.read_csv(validation_file, parse_dates=["date"])
         ref.set_index("date", inplace=True)

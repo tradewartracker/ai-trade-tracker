@@ -59,7 +59,12 @@ def make_plot():
 
     selected = series_select.value
     mode = mode_select.value
-    suffix = "_index" if "Index" in mode else "_dollars"
+    if "Index" in mode:
+        suffix = "_index"
+    elif "Tariff" in mode:
+        suffix = "_tariff"
+    else:
+        suffix = "_dollars"
 
     if not selected:
         plot = figure(x_axis_type="datetime", height=height, width=width,
@@ -101,6 +106,8 @@ def make_plot():
     plot.xaxis.axis_label = None
     if "Index" in mode:
         plot.yaxis.axis_label = "Monthly Index (2023 = 100)"
+    elif "Tariff" in mode:
+        plot.yaxis.axis_label = "Effective Tariff Rate (%)"
     else:
         plot.yaxis.axis_label = "Imports ($B)"
 
@@ -111,6 +118,8 @@ def make_plot():
     # Tooltips
     if "Index" in mode:
         val_fmt = "@y{0.1f}"
+    elif "Tariff" in mode:
+        val_fmt = "@y{0.00}%"
     else:
         val_fmt = "@y{0.00}"
 
@@ -149,6 +158,8 @@ def make_plot():
 
     if "Dollars" in mode:
         plot.yaxis.formatter = NumeralTickFormatter(format="$0.0")
+    elif "Tariff" in mode:
+        plot.yaxis.formatter = NumeralTickFormatter(format="0.00")
 
     plot.sizing_mode = "scale_both"
     plot.max_height = height
@@ -166,7 +177,12 @@ def download_csv():
     """Generate CSV for currently selected series and mode."""
     selected = series_select.value
     mode = mode_select.value
-    suffix = "_index" if "Index" in mode else "_dollars"
+    if "Index" in mode:
+        suffix = "_index"
+    elif "Tariff" in mode:
+        suffix = "_tariff"
+    else:
+        suffix = "_dollars"
 
     data_list = []
     for name in selected:
@@ -209,7 +225,7 @@ series_select = MultiChoice(value=default_series, title="Series",
 series_select.on_change("value", update_plot)
 
 mode_select = Select(value=default_mode, title="Display",
-                     options=["Index (2023 = 100)", "Dollars ($B)"], width=325)
+                     options=["Index (2023 = 100)", "Dollars ($B)", "Tariff Rate (%)"], width=325)
 mode_select.on_change("value", update_plot)
 
 download_button = Button(label="Generate CSV Download Link",
