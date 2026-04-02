@@ -46,7 +46,7 @@ df = pd.read_parquet("./data/ai_trade_series.parquet")
 
 # Determine date range for plot
 first_date = dt.datetime(2023, 1, 1)
-last_date = df.index[-1] + pd.DateOffset(months=2)
+last_date = df.index[-1] + pd.DateOffset(months=4)
 
 ###############################################################################
 # Build plot
